@@ -1,14 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Project ID will be auto-injected during deployment
-const SUPABASE_URL = 'https://<PROJECT-ID>.supabase.co'
-const SUPABASE_ANON_KEY = '<ANON_KEY>'
+// Supabase configuration
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://<PROJECT-ID>.supabase.co'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '<ANON_KEY>'
 
-if(SUPABASE_URL === 'https://<PROJECT-ID>.supabase.co' || SUPABASE_ANON_KEY === '<ANON_KEY>') {
-  console.warn('Supabase credentials not configured. Using mock data.');
-}
+// Check if Supabase is properly configured
+const isSupabaseConfigured = 
+  SUPABASE_URL !== 'https://<PROJECT-ID>.supabase.co' && 
+  SUPABASE_ANON_KEY !== '<ANON_KEY>' &&
+  SUPABASE_URL && 
+  SUPABASE_ANON_KEY;
 
-export const supabase = SUPABASE_URL !== 'https://<PROJECT-ID>.supabase.co' 
+export const supabase = isSupabaseConfigured 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
@@ -16,5 +19,15 @@ export const supabase = SUPABASE_URL !== 'https://<PROJECT-ID>.supabase.co'
       }
     })
   : null;
+
+// Export configuration status
+export const isConfigured = isSupabaseConfigured;
+
+// Log configuration status
+if (isSupabaseConfigured) {
+  console.log('✅ Supabase configured successfully');
+} else {
+  console.warn('⚠️ Supabase not configured - using mock data');
+}
 
 export default supabase;

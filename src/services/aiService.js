@@ -1,123 +1,145 @@
 import { supabase } from '../lib/supabase';
+import { geminiService } from './geminiService';
+import { youtubeService } from './youtubeService';
 
 class AIService {
   constructor() {
-    this.mockMode = !supabase;
+    this.useSupabase = !!supabase;
+    this.useGemini = !!import.meta.env.VITE_GEMINI_API_KEY;
   }
 
   // YouTube API integration
   async fetchVideoInfo(videoId) {
-    if (this.mockMode) {
-      return this.mockVideoInfo(videoId);
-    }
-
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-video-info', {
-        body: { videoId }
-      });
+      // First try YouTube API
+      const videoInfo = await youtubeService.getVideoInfo(videoId);
+      
+      // Try to get transcript
+      const transcript = await youtubeService.getTranscript(videoId);
+      if (transcript) {
+        videoInfo.transcript = transcript;
+      }
 
-      if (error) throw error;
-      return data;
+      return videoInfo;
     } catch (error) {
       console.error('Error fetching video info:', error);
-      return this.mockVideoInfo(videoId);
+      return youtubeService.mockVideoInfo(videoId);
+    }
+  }
+
+  // Search videos
+  async searchVideos(query, maxResults = 10) {
+    try {
+      return await youtubeService.searchVideos(query, maxResults);
+    } catch (error) {
+      console.error('Error searching videos:', error);
+      return youtubeService.mockSearchResults(query, maxResults);
     }
   }
 
   // Generate book content from videos
   async generateBookContent(videos, settings) {
-    if (this.mockMode) {
-      return this.mockGenerateContent(videos, settings);
+    if (this.useSupabase) {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-book-content', {
+          body: { videos, settings }
+        });
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Supabase function error:', error);
+        // Fallback to Gemini
+      }
     }
 
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-book-content', {
-        body: { videos, settings }
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error generating content:', error);
-      return this.mockGenerateContent(videos, settings);
+    if (this.useGemini) {
+      try {
+        return await geminiService.generateBookContent(videos, settings);
+      } catch (error) {
+        console.error('Gemini API error:', error);
+        // Fallback to mock
+      }
     }
+
+    return this.mockGenerateContent(videos, settings);
   }
 
   // Enhance chapter content
   async enhanceChapter(chapter, enhancements) {
-    if (this.mockMode) {
-      return this.mockEnhanceChapter(chapter, enhancements);
+    if (this.useSupabase) {
+      try {
+        const { data, error } = await supabase.functions.invoke('enhance-chapter', {
+          body: { chapter, enhancements }
+        });
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Supabase function error:', error);
+      }
     }
 
-    try {
-      const { data, error } = await supabase.functions.invoke('enhance-chapter', {
-        body: { chapter, enhancements }
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error enhancing chapter:', error);
-      return this.mockEnhanceChapter(chapter, enhancements);
+    if (this.useGemini) {
+      try {
+        return await geminiService.enhanceChapter(chapter, enhancements);
+      } catch (error) {
+        console.error('Gemini API error:', error);
+      }
     }
+
+    return this.mockEnhanceChapter(chapter, enhancements);
   }
 
   // AI Assistant chat
   async sendMessage(message, context) {
-    if (this.mockMode) {
-      return this.mockAIResponse(message, context);
+    if (this.useSupabase) {
+      try {
+        const { data, error } = await supabase.functions.invoke('ai-chat', {
+          body: { message, context }
+        });
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Supabase function error:', error);
+      }
     }
 
-    try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { message, context }
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error in AI chat:', error);
-      return this.mockAIResponse(message, context);
+    if (this.useGemini) {
+      try {
+        return await geminiService.chatResponse(message, context);
+      } catch (error) {
+        console.error('Gemini API error:', error);
+      }
     }
+
+    return this.mockAIResponse(message, context);
   }
 
   // Generate additional content segment
   async generateSegment(chapterTitle, existingContent, wordCount = 1000) {
-    if (this.mockMode) {
-      return this.mockGenerateSegment(chapterTitle, existingContent, wordCount);
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-segment', {
-        body: { chapterTitle, existingContent, wordCount }
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error generating segment:', error);
-      return this.mockGenerateSegment(chapterTitle, existingContent, wordCount);
-    }
-  }
-
-  // Mock implementations for development
-  mockVideoInfo(videoId) {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        resolve({
-          id: videoId,
-          title: `Sample Video ${videoId.slice(-4)}`,
-          channel: 'Sample Channel',
-          duration: '10:30',
-          thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-          description: 'This is a sample video description for development.',
-          publishedAt: new Date().toISOString(),
-          transcript: 'Sample transcript content for the video...'
+    if (this.useSupabase) {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-segment', {
+          body: { chapterTitle, existingContent, wordCount }
         });
-      }, 1000);
-    });
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Supabase function error:', error);
+      }
+    }
+
+    if (this.useGemini) {
+      try {
+        return await geminiService.generateSegment(chapterTitle, existingContent, wordCount);
+      } catch (error) {
+        console.error('Gemini API error:', error);
+      }
+    }
+
+    return this.mockGenerateSegment(chapterTitle, existingContent, wordCount);
   }
 
+  // Mock implementations for fallback
   mockGenerateContent(videos, settings) {
     return new Promise(resolve => {
       setTimeout(() => {
@@ -211,13 +233,16 @@ class AIService {
 
         for (const [key, response] of Object.entries(responses)) {
           if (message.includes(key)) {
-            return resolve({ response, timestamp: new Date().toISOString() });
+            return resolve({
+              response,
+              timestamp: new Date().toISOString()
+            });
           }
         }
 
-        resolve({ 
-          response: responses.default, 
-          timestamp: new Date().toISOString() 
+        resolve({
+          response: responses.default,
+          timestamp: new Date().toISOString()
         });
       }, 1500);
     });
@@ -302,10 +327,10 @@ ${topic}について学習した内容をまとめると：
     // Adjust content length to target
     const currentLength = baseContent.length;
     if (currentLength < targetLength) {
-      const additionalContent = '\n\n## 補足説明\n\n' + '詳細な説明がここに続きます。'.repeat(Math.floor((targetLength - currentLength) / 20));
+      const additionalContent = '\n\n## 補足説明\n\n' + 
+        '詳細な説明がここに続きます。'.repeat(Math.floor((targetLength - currentLength) / 20));
       return baseContent + additionalContent;
     }
-
     return baseContent;
   }
 }

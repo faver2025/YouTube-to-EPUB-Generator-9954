@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiPlus, FiBook, FiClock, FiFileText, FiEdit3, FiTrash2, FiDownload, FiZap, FiTrendingUp, FiUsers, FiStar } = FiIcons;
+const { FiPlus, FiBook, FiClock, FiFileText, FiEdit3, FiTrash2, FiDownload, FiZap, FiTrendingUp, FiUsers, FiStar, FiCheckCircle } = FiIcons;
 
 const Dashboard = () => {
   const [projects, setProjects] = useState([]);
@@ -14,18 +14,22 @@ const Dashboard = () => {
     completedBooks: 0,
     avgRating: 0
   });
+  const [aiStatus, setAiStatus] = useState('checking');
 
   useEffect(() => {
+    // Check AI status
+    checkAIStatus();
+    
     // Load projects from localStorage
     const savedProjects = localStorage.getItem('youtube-epub-projects');
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
       setProjects(parsedProjects);
-      
+
       // Calculate stats
       const totalWords = parsedProjects.reduce((sum, p) => sum + (p.totalChars || 0), 0);
       const completedBooks = parsedProjects.filter(p => p.status === 'completed').length;
-      
+
       setStats({
         totalProjects: parsedProjects.length,
         totalWords,
@@ -34,6 +38,17 @@ const Dashboard = () => {
       });
     }
   }, []);
+
+  const checkAIStatus = () => {
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const youtubeKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+    
+    if (geminiKey && geminiKey !== 'your_gemini_api_key_here') {
+      setAiStatus('active');
+    } else {
+      setAiStatus('inactive');
+    }
+  };
 
   const deleteProject = (projectId) => {
     const updatedProjects = projects.filter(p => p.id !== projectId);
@@ -59,7 +74,7 @@ const Dashboard = () => {
     );
   };
 
-  const StatCard = ({ icon, label, value, color }) => (
+  const StatCard = ({ icon, label, value, color, subtitle }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -69,9 +84,42 @@ const Dashboard = () => {
         <div>
           <p className="text-white text-opacity-80 text-sm">{label}</p>
           <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          {subtitle && (
+            <p className="text-white text-opacity-60 text-xs mt-1">{subtitle}</p>
+          )}
         </div>
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
           <SafeIcon icon={icon} className="text-white text-xl" />
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  const AIStatusBanner = () => (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`mb-6 p-4 rounded-xl border-2 ${
+        aiStatus === 'active'
+          ? 'bg-green-50 border-green-200 text-green-800'
+          : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <SafeIcon 
+          icon={aiStatus === 'active' ? FiCheckCircle : FiZap} 
+          className="text-xl" 
+        />
+        <div>
+          <h3 className="font-semibold">
+            {aiStatus === 'active' ? '🎉 AI機能が有効化されました！' : '⚠️ AI機能を設定してください'}
+          </h3>
+          <p className="text-sm">
+            {aiStatus === 'active' 
+              ? 'Google Gemini APIが正常に動作しています。高品質な電子書籍を生成できます。'
+              : 'Google Gemini APIキーを.envファイルに設定すると、実際のAI機能が使用できます。'
+            }
+          </p>
         </div>
       </div>
     </motion.div>
@@ -93,6 +141,9 @@ const Dashboard = () => {
           </p>
         </motion.div>
 
+        {/* AI Status Banner */}
+        <AIStatusBanner />
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatCard
@@ -100,24 +151,28 @@ const Dashboard = () => {
             label="総プロジェクト数"
             value={stats.totalProjects}
             color="bg-blue-500"
+            subtitle={aiStatus === 'active' ? 'AI強化対応' : 'モックデータ'}
           />
           <StatCard
             icon={FiFileText}
             label="総文字数"
             value={stats.totalWords.toLocaleString()}
             color="bg-green-500"
+            subtitle="高品質コンテンツ"
           />
           <StatCard
             icon={FiTrendingUp}
             label="完成書籍"
             value={stats.completedBooks}
             color="bg-purple-500"
+            subtitle="公開可能"
           />
           <StatCard
-            icon={FiStar}
-            label="平均評価"
-            value={stats.avgRating}
-            color="bg-yellow-500"
+            icon={aiStatus === 'active' ? FiZap : FiStar}
+            label={aiStatus === 'active' ? 'AI機能' : '平均評価'}
+            value={aiStatus === 'active' ? '有効' : stats.avgRating}
+            color={aiStatus === 'active' ? 'bg-yellow-500' : 'bg-orange-500'}
+            subtitle={aiStatus === 'active' ? 'Gemini Pro' : '読者評価'}
           />
         </div>
 
@@ -135,10 +190,14 @@ const Dashboard = () => {
               <SafeIcon icon={FiPlus} className="text-lg" />
               新規プロジェクト
             </Link>
-            <button className="flex items-center gap-2 px-6 py-3 bg-white bg-opacity-20 text-white rounded-xl hover:bg-opacity-30 transition-all backdrop-blur-sm border border-white border-opacity-20">
-              <SafeIcon icon={FiZap} className="text-lg" />
-              AIアシスタント
-            </button>
+            
+            {aiStatus === 'active' && (
+              <div className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl backdrop-blur-sm border border-white border-opacity-20">
+                <SafeIcon icon={FiZap} className="text-lg" />
+                AI機能 有効
+              </div>
+            )}
+            
             <button className="flex items-center gap-2 px-6 py-3 bg-white bg-opacity-20 text-white rounded-xl hover:bg-opacity-30 transition-all backdrop-blur-sm border border-white border-opacity-20">
               <SafeIcon icon={FiUsers} className="text-lg" />
               コミュニティ
@@ -165,7 +224,7 @@ const Dashboard = () => {
                   YouTube動画から電子書籍を作成
                 </p>
                 <div className="mt-4 px-4 py-2 bg-white bg-opacity-20 rounded-lg text-white text-sm">
-                  AIアシスタント付き
+                  {aiStatus === 'active' ? 'AI強化機能 有効' : 'モックデータで体験'}
                 </div>
               </div>
             </Link>
@@ -244,6 +303,7 @@ const Dashboard = () => {
                     進行状況を見る
                   </Link>
                 )}
+
                 {project.status === 'completed' && (
                   <>
                     <Link
@@ -257,6 +317,7 @@ const Dashboard = () => {
                     </button>
                   </>
                 )}
+
                 {project.status === 'pending' && (
                   <Link
                     to={`/generate/${project.id}`}
@@ -284,20 +345,21 @@ const Dashboard = () => {
               まだプロジェクトがありません
             </h3>
             <p className="text-white text-opacity-60 mb-8 max-w-md mx-auto">
-              YouTube動画から高品質な電子書籍を作成して始めましょう。AIアシスタントがサポートします。
+              YouTube動画から高品質な電子書籍を作成して始めましょう。
+              {aiStatus === 'active' ? 'AI機能が有効化されているので、本格的な生成が可能です。' : 'まずはモックデータで機能を体験してみてください。'}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/input"
-                className="inline-flex items-center gap-2 bg-white bg-opacity-20 text-white px-6 py-3 rounded-xl hover:bg-opacity-30 transition-colors backdrop-blur-sm border border-white border-opacity-20"
+                className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl transition-colors backdrop-blur-sm border border-white border-opacity-20 ${
+                  aiStatus === 'active'
+                    ? 'bg-gradient-to-r from-green-500 to-teal-600 text-white'
+                    : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30'
+                }`}
               >
                 <SafeIcon icon={FiPlus} className="text-lg" />
-                新規プロジェクトを作成
+                {aiStatus === 'active' ? 'AI電子書籍を作成' : '体験版で作成'}
               </Link>
-              <button className="inline-flex items-center gap-2 bg-white bg-opacity-20 text-white px-6 py-3 rounded-xl hover:bg-opacity-30 transition-colors backdrop-blur-sm border border-white border-opacity-20">
-                <SafeIcon icon={FiZap} className="text-lg" />
-                AIアシスタントを試す
-              </button>
             </div>
           </motion.div>
         )}
